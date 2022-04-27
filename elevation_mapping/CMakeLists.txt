@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 14)
 add_compile_options(-Wall -Wextra -Wpedantic)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_BUILD_TYPE "Release")
 
 set(
   CATKIN_PACKAGE_DEPENDENCIES 
