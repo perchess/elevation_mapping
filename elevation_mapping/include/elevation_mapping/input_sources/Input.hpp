@@ -12,6 +12,7 @@
 #include <ros/ros.h>
 #include <string>
 
+#include "elevation_mapping/ThreadSafeDataWrapper.hpp"
 #include "elevation_mapping/sensor_processors/SensorProcessorBase.hpp"
 
 namespace elevation_mapping {
@@ -34,13 +35,21 @@ class Input {
   explicit Input(ros::NodeHandle nh);
 
   /**
+   * Whether the input source is enabled or not.
+   */
+  bool isEnabled() const {
+    const Parameters parameters{parameters_.getData()};
+    return parameters.isEnabled_;
+  }
+
+  /**
    * @brief Configure the input source.
    * @param name Name of this input source.
-   * @param parameters The configuration parameters.
+   * @param configuration to configure from.
    * @param generalSensorProcessorParameters Parameters shared by all sensor processors.
    * @return True if configuring was successful.
    */
-  bool configure(std::string name, const XmlRpc::XmlRpcValue& parameters,
+  bool configure(std::string name, const XmlRpc::XmlRpcValue& configuration,
                  const SensorProcessorBase::GeneralParameters& generalSensorProcessorParameters);
 
   /**
@@ -61,7 +70,10 @@ class Input {
   /**
    * @return The type of this input source.
    */
-  std::string getType() { return type_; }
+  std::string getType() {
+    const Parameters parameters{parameters_.getData()};
+    return parameters.type_;
+  }
 
  private:
   /**
@@ -83,18 +95,24 @@ class Input {
   SensorProcessorBase::Ptr sensorProcessor_;
 
   // Parameters.
-  std::string name_;
-  std::string type_;
-  uint32_t queueSize_;
-  std::string topic_;
-  bool publishOnUpdate_;
+  struct Parameters {
+    std::string name_;
+    std::string type_;
+    bool isEnabled_{true};
+    uint32_t queueSize_{0};
+    std::string topic_;
+    bool publishOnUpdate_{true};
+  };
+  ThreadSafeDataWrapper<Parameters> parameters_;
 };
 
 template <typename MsgT>
 void Input::registerCallback(ElevationMapping& map, CallbackT<MsgT> callback) {
+  const Parameters parameters{parameters_.getData()};
   subscriber_ = nodeHandle_.subscribe<MsgT>(
-      topic_, queueSize_, std::bind(callback, std::ref(map), std::placeholders::_1, publishOnUpdate_, std::ref(sensorProcessor_)));
-  ROS_INFO("Subscribing to %s: %s, queue_size: %i.", type_.c_str(), topic_.c_str(), queueSize_);
+      parameters.topic_, parameters.queueSize_,
+      std::bind(callback, std::ref(map), std::placeholders::_1, parameters.publishOnUpdate_, std::ref(sensorProcessor_)));
+  ROS_INFO("Subscribing to %s: %s, queue_size: %i.", parameters.type_.c_str(), parameters.topic_.c_str(), parameters.queueSize_);
 }
 
 }  // namespace elevation_mapping

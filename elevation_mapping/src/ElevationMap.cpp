@@ -39,24 +39,15 @@ ElevationMap::ElevationMap(ros::NodeHandle nodeHandle)
                "dynamic_time", "lowest_scan_point", "sensor_x_at_lowest_scan", "sensor_y_at_lowest_scan", "sensor_z_at_lowest_scan"}),
       fusedMap_({"elevation", "upper_bound", "lower_bound", "color"}),
       postprocessorPool_(nodeHandle.param("postprocessor_num_threads", 1), nodeHandle_),
-      hasUnderlyingMap_(false),
-      minVariance_(0.000009),
-      maxVariance_(0.0009),
-      mahalanobisDistanceThreshold_(2.5),
-      multiHeightNoise_(0.000009),
-      minHorizontalVariance_(0.0001),
-      maxHorizontalVariance_(0.05),
-      enableVisibilityCleanup_(true),
-      enableContinuousCleanup_(false),
-      visibilityCleanupDuration_(0.0),
-      scanningDuration_(1.0) {
+      hasUnderlyingMap_(false) {
   rawMap_.setBasicLayers({"elevation", "variance"});
   fusedMap_.setBasicLayers({"elevation", "upper_bound", "lower_bound"});
   clear();
+  const Parameters parameters{parameters_.getData()};
 
   elevationMapFusedPublisher_ = nodeHandle_.advertise<grid_map_msgs::GridMap>("elevation_map", 1);
-  if (!underlyingMapTopic_.empty()) {
-    underlyingMapSubscriber_ = nodeHandle_.subscribe(underlyingMapTopic_, 1, &ElevationMap::underlyingMapCallback, this);
+  if (!parameters.underlyingMapTopic_.empty()) {
+    underlyingMapSubscriber_ = nodeHandle_.subscribe(parameters.underlyingMapTopic_, 1, &ElevationMap::underlyingMapCallback, this);
   }
   // TODO(max): if (enableVisibilityCleanup_) when parameter cleanup is ready.
   visibilityCleanupMapPublisher_ = nodeHandle_.advertise<grid_map_msgs::GridMap>("visibility_cleanup_map", 1);
@@ -75,6 +66,7 @@ void ElevationMap::setGeometry(const grid_map::Length& length, const double& res
 }
 bool ElevationMap::add(const PointCloudType::Ptr pointCloud, Eigen::VectorXf& pointCloudVariances, const ros::Time& timestamp,
                        const Eigen::Affine3d& transformationSensorToMap) {
+  const Parameters parameters{parameters_.getData()};
   if (static_cast<unsigned int>(pointCloud->size()) != static_cast<unsigned int>(pointCloudVariances.size())) {
     ROS_ERROR("ElevationMap::add: Size of point cloud (%i) and variances (%i) do not agree.", (int)pointCloud->size(),
               (int)pointCloudVariances.size());
@@ -140,8 +132,8 @@ bool ElevationMap::add(const PointCloudType::Ptr pointCloud, Eigen::VectorXf& po
       // No prior information in elevation map, use measurement.
       elevation = point.z;  // NOLINT(cppcoreguidelines-pro-type-union-access)
       variance = pointVariance;
-      horizontalVarianceX = minHorizontalVariance_;
-      horizontalVarianceY = minHorizontalVariance_;
+      horizontalVarianceX = parameters.minHorizontalVariance_;
+      horizontalVarianceY = parameters.minHorizontalVariance_;
       horizontalVarianceXY = 0.0;
       grid_map::colorVectorToValue(point.getRGBVector3i(), color);
       continue;
@@ -149,17 +141,18 @@ bool ElevationMap::add(const PointCloudType::Ptr pointCloud, Eigen::VectorXf& po
 
     // Deal with multiple heights in one cell.
     const double mahalanobisDistance = fabs(point.z - elevation) / sqrt(variance);  // NOLINT(cppcoreguidelines-pro-type-union-access)
-    if (mahalanobisDistance > mahalanobisDistanceThreshold_) {
-      if (scanTimeSinceInitialization - time <= scanningDuration_ &&
+    if (mahalanobisDistance > parameters.mahalanobisDistanceThreshold_) {
+      if (scanTimeSinceInitialization - time <= parameters.scanningDuration_ &&
           elevation > point.z) {  // NOLINT(cppcoreguidelines-pro-type-union-access)
         // Ignore point if measurement is from the same point cloud (time comparison) and
         // if measurement is lower then the elevation in the map.
-      } else if (scanTimeSinceInitialization - time <= scanningDuration_) {
+      } else if (scanTimeSinceInitialization - time <= parameters.scanningDuration_) {
         // If point is higher.
-        elevation = point.z;  // NOLINT(cppcoreguidelines-pro-type-union-access)
-        variance = pointVariance;
+        elevation = parameters.increaseHeightAlpha_ * elevation +
+                    (1.0 - parameters.increaseHeightAlpha_) * point.z;  // NOLINT(cppcoreguidelines-pro-type-union-access)
+        variance = parameters.increaseHeightAlpha_ * variance + (1.0 - parameters.increaseHeightAlpha_) * pointVariance;
       } else {
-        variance += multiHeightNoise_;
+        variance += parameters.multiHeightNoise_;
       }
       continue;
     }
@@ -185,8 +178,8 @@ bool ElevationMap::add(const PointCloudType::Ptr pointCloud, Eigen::VectorXf& po
     dynamicTime = currentTimeSecondsPattern;
 
     // Horizontal variances are reset.
-    horizontalVarianceX = minHorizontalVariance_;
-    horizontalVarianceY = minHorizontalVariance_;
+    horizontalVarianceX = parameters.minHorizontalVariance_;
+    horizontalVarianceY = parameters.minHorizontalVariance_;
     horizontalVarianceXY = 0.0;
   }
 
@@ -433,6 +426,7 @@ bool ElevationMap::clear() {
 }
 
 void ElevationMap::visibilityCleanup(const ros::Time& updatedTime) {
+  const Parameters parameters{parameters_.getData()};
   // Get current time to compute calculation time.
   const ros::WallTime methodStartTime(ros::WallTime::now());
   const double timeSinceInitialization = (updatedTime - initialTime_).toSec();
@@ -492,7 +486,7 @@ void ElevationMap::visibilityCleanup(const ros::Time& updatedTime) {
       continue;
     }
     const auto& time = visibilityCleanupMap_.at("time", *iterator);
-    if (timeSinceInitialization - time > scanningDuration_) {
+    if (timeSinceInitialization - time > parameters.scanningDuration_) {
       // Only remove cells that have not been updated during the last scan duration.
       // This prevents a.o. removal of overhanging objects.
       const auto& elevation = visibilityCleanupMap_.at("elevation", *iterator);
@@ -525,7 +519,7 @@ void ElevationMap::visibilityCleanup(const ros::Time& updatedTime) {
 
   ros::WallDuration duration(ros::WallTime::now() - methodStartTime);
   ROS_DEBUG("Visibility cleanup has been performed in %f s (%d points).", duration.toSec(), (int)cellPositionsToRemove.size());
-  if (duration.toSec() > visibilityCleanupDuration_) {
+  if (duration.toSec() > parameters.visibilityCleanupDuration_) {
     ROS_WARN("Visibility cleanup duration is too high (current rate is %f).", 1.0 / duration.toSec());
   }
 }
@@ -642,12 +636,16 @@ boost::recursive_mutex& ElevationMap::getRawDataMutex() {
 }
 
 bool ElevationMap::clean() {
+  const Parameters parameters{parameters_.getData()};
   boost::recursive_mutex::scoped_lock scopedLockForRawData(rawMapMutex_);
-  rawMap_.get("variance") = rawMap_.get("variance").unaryExpr(VarianceClampOperator<float>(minVariance_, maxVariance_));
+  rawMap_.get("variance") =
+      rawMap_.get("variance").unaryExpr(VarianceClampOperator<float>(parameters.minVariance_, parameters.maxVariance_));
   rawMap_.get("horizontal_variance_x") =
-      rawMap_.get("horizontal_variance_x").unaryExpr(VarianceClampOperator<float>(minHorizontalVariance_, maxHorizontalVariance_));
+      rawMap_.get("horizontal_variance_x")
+          .unaryExpr(VarianceClampOperator<float>(parameters.minHorizontalVariance_, parameters.maxHorizontalVariance_));
   rawMap_.get("horizontal_variance_y") =
-      rawMap_.get("horizontal_variance_y").unaryExpr(VarianceClampOperator<float>(minHorizontalVariance_, maxHorizontalVariance_));
+      rawMap_.get("horizontal_variance_y")
+          .unaryExpr(VarianceClampOperator<float>(parameters.minHorizontalVariance_, parameters.maxHorizontalVariance_));
   return true;
 }
 
@@ -680,6 +678,7 @@ bool ElevationMap::hasFusedMapSubscribers() const {
 }
 
 void ElevationMap::underlyingMapCallback(const grid_map_msgs::GridMap& underlyingMap) {
+  const Parameters parameters{parameters_.getData()};
   ROS_INFO("Updating underlying map.");
   grid_map::GridMapRosConverter::fromMessage(underlyingMap, underlyingMap_);
   if (underlyingMap_.getFrameId() != rawMap_.getFrameId()) {
@@ -692,13 +691,13 @@ void ElevationMap::underlyingMapCallback(const grid_map_msgs::GridMap& underlyin
     return;
   }
   if (!underlyingMap_.exists("variance")) {
-    underlyingMap_.add("variance", minVariance_);
+    underlyingMap_.add("variance", parameters.minVariance_);
   }
   if (!underlyingMap_.exists("horizontal_variance_x")) {
-    underlyingMap_.add("horizontal_variance_x", minHorizontalVariance_);
+    underlyingMap_.add("horizontal_variance_x", parameters.minHorizontalVariance_);
   }
   if (!underlyingMap_.exists("horizontal_variance_y")) {
-    underlyingMap_.add("horizontal_variance_y", minHorizontalVariance_);
+    underlyingMap_.add("horizontal_variance_y", parameters.minHorizontalVariance_);
   }
   if (!underlyingMap_.exists("color")) {
     underlyingMap_.add("color", 0.0);

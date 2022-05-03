@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.5.1)
 project(elevation_mapping)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 add_compile_options(-Wall -Wextra -Wpedantic)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -80,6 +80,10 @@ add_library(${PROJECT_NAME}_library
   src/sensor_processors/PerfectSensorProcessor.cpp
 )
 
+add_dependencies(${PROJECT_NAME}_library
+  ${PROJECT_NAME}_pcl_types
+)
+
 target_link_libraries(${PROJECT_NAME}_library
   ${catkin_LIBRARIES}
   ${PROJECT_NAME}_pcl_types
@@ -92,6 +96,10 @@ target_link_libraries(${PROJECT_NAME}_library
 
 add_executable(${PROJECT_NAME}
   src/elevation_mapping_node.cpp
+)
+
+add_dependencies(${PROJECT_NAME}
+  ${PROJECT_NAME}_library
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -148,16 +156,16 @@ if(CATKIN_ENABLE_TESTING)
     test/test_elevation_mapping.cpp
     test/WeightedEmpiricalCumulativeDistributionFunctionTest.cpp
   )
-
+  add_dependencies(test_${PROJECT_NAME}_cumulative_distribution
+    ${PROJECT_NAME}_library
+  )
   target_link_libraries(test_${PROJECT_NAME}_cumulative_distribution
     ${PROJECT_NAME}_library
   )
-
   target_include_directories(test_${PROJECT_NAME}_cumulative_distribution
     PRIVATE
       include
   )
-
   target_include_directories(test_${PROJECT_NAME}_cumulative_distribution
     SYSTEM PUBLIC
       ${catkin_INCLUDE_DIRS}
@@ -169,16 +177,16 @@ if(CATKIN_ENABLE_TESTING)
     test/input_sources/test_input_sources.cpp
     test/input_sources/InputSourcesTest.cpp
   )
-
+  add_dependencies(test_${PROJECT_NAME}_input_sources
+    ${PROJECT_NAME}_library
+  )
   target_link_libraries(test_${PROJECT_NAME}_input_sources
     ${PROJECT_NAME}_library
   )
-
   target_include_directories(test_${PROJECT_NAME}_input_sources
     PRIVATE
       include
   )
-
   target_include_directories(test_${PROJECT_NAME}_input_sources SYSTEM PUBLIC
     ${Boost_INCLUDE_DIRS}
     ${catkin_INCLUDE_DIRS}
@@ -191,19 +199,40 @@ if(CATKIN_ENABLE_TESTING)
     test/postprocessing/main.cpp
     test/postprocessing/PostprocessorTest.cpp
   )
-
+  add_dependencies(test_${PROJECT_NAME}_postprocessor
+    ${PROJECT_NAME}_library
+  )
   target_include_directories(test_${PROJECT_NAME}_postprocessor PRIVATE
     include
   )
-
   target_include_directories(test_${PROJECT_NAME}_postprocessor SYSTEM PUBLIC
     ${catkin_INCLUDE_DIRS}
   )
-
   target_link_libraries(test_${PROJECT_NAME}_postprocessor
     ${GTEST_LIBRARIES}
     ${PROJECT_NAME}_library
     ${catkin_LIBRARIES}
+  )
+
+  # Thread safe parameter wrapper test
+  catkin_add_gtest(test_${PROJECT_NAME}_thread_safe_parameter_wrapper
+    test/ThreadSafeParameterWrapperTest.cpp
+  )
+  add_dependencies(test_${PROJECT_NAME}_thread_safe_parameter_wrapper
+    ${PROJECT_NAME}_library
+  )
+  target_link_libraries(test_${PROJECT_NAME}_thread_safe_parameter_wrapper
+    ${PROJECT_NAME}_library
+    ${catkin_LIBRARIES}
+    gtest_main
+  )
+  target_include_directories(test_${PROJECT_NAME}_thread_safe_parameter_wrapper
+    PRIVATE
+    include
+  )
+  target_include_directories(test_${PROJECT_NAME}_thread_safe_parameter_wrapper
+    SYSTEM PUBLIC
+    ${catkin_INCLUDE_DIRS}
   )
 
   find_package(cmake_code_coverage QUIET)
@@ -216,6 +245,9 @@ if(CATKIN_ENABLE_TESTING)
       )
       add_rostest_coverage(TEST_BUILD_TARGETS
         test_${PROJECT_NAME}_postprocessor
+      )
+      add_gtest_coverage(TEST_BUILD_TARGETS
+        test_${PROJECT_NAME}_thread_safe_parameter_wrapper
       )
   endif()
 endif()

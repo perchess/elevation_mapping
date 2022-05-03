@@ -47,16 +47,20 @@ bool InputSourceManager::configure(const XmlRpc::XmlRpcValue& config, const std:
                                                                       nodeHandle_.param("map_frame_id", std::string("/map"))};
   // Configure all input sources in the list.
   for (const auto& inputConfig : config) {
-    Input source = Input(ros::NodeHandle(nodeHandle_.resolveName(sourceConfigurationName + "/" + inputConfig.first)));
+    Input source{(ros::NodeHandle(nodeHandle_.resolveName(sourceConfigurationName + "/" + inputConfig.first)))};
 
-    bool configured = source.configure(inputConfig.first, inputConfig.second, generalSensorProcessorConfig);
+    const bool configured{source.configure(inputConfig.first, inputConfig.second, generalSensorProcessorConfig)};
     if (!configured) {
       successfulConfiguration = false;
       continue;
     }
 
-    std::string subscribedTopic = source.getSubscribedTopic();
-    bool topicIsUnique = subscribedTopics.insert(subscribedTopic).second;
+    if (!source.isEnabled()) {
+      continue;
+    }
+
+    const std::string subscribedTopic{source.getSubscribedTopic()};
+    const bool topicIsUnique{subscribedTopics.insert(subscribedTopic).second};
 
     if (topicIsUnique) {
       sources_.push_back(std::move(source));

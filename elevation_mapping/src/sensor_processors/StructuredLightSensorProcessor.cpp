@@ -31,19 +31,23 @@ StructuredLightSensorProcessor::~StructuredLightSensorProcessor() = default;
 
 bool StructuredLightSensorProcessor::readParameters() {
   SensorProcessorBase::readParameters();
-  nodeHandle_.param("sensor_processor/normal_factor_a", sensorParameters_["normal_factor_a"], 0.0);
-  nodeHandle_.param("sensor_processor/normal_factor_b", sensorParameters_["normal_factor_b"], 0.0);
-  nodeHandle_.param("sensor_processor/normal_factor_c", sensorParameters_["normal_factor_c"], 0.0);
-  nodeHandle_.param("sensor_processor/normal_factor_d", sensorParameters_["normal_factor_d"], 0.0);
-  nodeHandle_.param("sensor_processor/normal_factor_e", sensorParameters_["normal_factor_e"], 0.0);
-  nodeHandle_.param("sensor_processor/lateral_factor", sensorParameters_["lateral_factor"], 0.0);
-  nodeHandle_.param("sensor_processor/cutoff_min_depth", sensorParameters_["cutoff_min_depth"], std::numeric_limits<double>::min());
-  nodeHandle_.param("sensor_processor/cutoff_max_depth", sensorParameters_["cutoff_max_depth"], std::numeric_limits<double>::max());
+  auto [parameters, parameterGuard]{parameters_.getDataToWrite()};
+  nodeHandle_.param("sensor_processor/normal_factor_a", parameters.sensorParameters_["normal_factor_a"], 0.0);
+  nodeHandle_.param("sensor_processor/normal_factor_b", parameters.sensorParameters_["normal_factor_b"], 0.0);
+  nodeHandle_.param("sensor_processor/normal_factor_c", parameters.sensorParameters_["normal_factor_c"], 0.0);
+  nodeHandle_.param("sensor_processor/normal_factor_d", parameters.sensorParameters_["normal_factor_d"], 0.0);
+  nodeHandle_.param("sensor_processor/normal_factor_e", parameters.sensorParameters_["normal_factor_e"], 0.0);
+  nodeHandle_.param("sensor_processor/lateral_factor", parameters.sensorParameters_["lateral_factor"], 0.0);
+  nodeHandle_.param("sensor_processor/cutoff_min_depth", parameters.sensorParameters_["cutoff_min_depth"],
+                    std::numeric_limits<double>::min());
+  nodeHandle_.param("sensor_processor/cutoff_max_depth", parameters.sensorParameters_["cutoff_max_depth"],
+                    std::numeric_limits<double>::max());
   return true;
 }
 
 bool StructuredLightSensorProcessor::computeVariances(const PointCloudType::ConstPtr pointCloud,
                                                       const Eigen::Matrix<double, 6, 6>& robotPoseCovariance, Eigen::VectorXf& variances) {
+  const Parameters parameters{parameters_.getData()};
   variances.resize(pointCloud->size());
 
   // Projection vector (P).
@@ -77,12 +81,12 @@ bool StructuredLightSensorProcessor::computeVariances(const PointCloudType::Cons
 
     // Compute sensor covariance matrix (Sigma_S) with sensor model.
     const float deviationNormal =
-        sensorParameters_.at("normal_factor_a") +
-        sensorParameters_.at("normal_factor_b") * (measurementDistance - sensorParameters_.at("normal_factor_c")) *
-            (measurementDistance - sensorParameters_.at("normal_factor_c")) +
-        sensorParameters_.at("normal_factor_d") * pow(measurementDistance, sensorParameters_.at("normal_factor_e"));
+        parameters.sensorParameters_.at("normal_factor_a") +
+        parameters.sensorParameters_.at("normal_factor_b") * (measurementDistance - parameters.sensorParameters_.at("normal_factor_c")) *
+            (measurementDistance - parameters.sensorParameters_.at("normal_factor_c")) +
+        parameters.sensorParameters_.at("normal_factor_d") * pow(measurementDistance, parameters.sensorParameters_.at("normal_factor_e"));
     const float varianceNormal = deviationNormal * deviationNormal;
-    const float deviationLateral = sensorParameters_.at("lateral_factor") * measurementDistance;
+    const float deviationLateral = parameters.sensorParameters_.at("lateral_factor") * measurementDistance;
     const float varianceLateral = deviationLateral * deviationLateral;
     Eigen::Matrix3f sensorVariance = Eigen::Matrix3f::Zero();
     sensorVariance.diagonal() << varianceLateral, varianceLateral, varianceNormal;
@@ -106,13 +110,15 @@ bool StructuredLightSensorProcessor::computeVariances(const PointCloudType::Cons
 }
 
 bool StructuredLightSensorProcessor::filterPointCloudSensorType(const PointCloudType::Ptr pointCloud) {
+  const Parameters parameters{parameters_.getData()};
   pcl::PassThrough<pcl::PointXYZRGBConfidenceRatio> passThroughFilter;
   PointCloudType tempPointCloud;
 
   // cutoff points with z values
   passThroughFilter.setInputCloud(pointCloud);
   passThroughFilter.setFilterFieldName("z");
-  passThroughFilter.setFilterLimits(sensorParameters_.at("cutoff_min_depth"), sensorParameters_.at("cutoff_max_depth"));
+  passThroughFilter.setFilterLimits(parameters.sensorParameters_.at("cutoff_min_depth"),
+                                    parameters.sensorParameters_.at("cutoff_max_depth"));
   passThroughFilter.filter(tempPointCloud);
   pointCloud->swap(tempPointCloud);
 

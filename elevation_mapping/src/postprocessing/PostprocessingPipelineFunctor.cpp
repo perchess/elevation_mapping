@@ -18,11 +18,12 @@ PostprocessingPipelineFunctor::PostprocessingPipelineFunctor(ros::NodeHandle& no
     : nodeHandle_(nodeHandle), filterChain_("grid_map::GridMap"), filterChainConfigured_(false) {
   // TODO (magnus) Add logic when setting up failed. What happens actually if it is not configured?
   readParameters();
-
-  publisher_ = nodeHandle_.advertise<grid_map_msgs::GridMap>(outputTopic_, 1, true);
+  const Parameters parameters{parameters_.getData()};
+  publisher_ = nodeHandle_.advertise<grid_map_msgs::GridMap>(parameters.outputTopic_, 1, true);
 
   // Setup filter chain.
-  if (!nodeHandle.hasParam(filterChainParametersName_) || !filterChain_.configure(filterChainParametersName_, nodeHandle)) {
+  if (!nodeHandle.hasParam(parameters.filterChainParametersName_) ||
+      !filterChain_.configure(parameters.filterChainParametersName_, nodeHandle)) {
     ROS_WARN("Could not configure the filter chain. Will publish the raw elevation map without postprocessing!");
     return;
   }
@@ -33,8 +34,10 @@ PostprocessingPipelineFunctor::PostprocessingPipelineFunctor(ros::NodeHandle& no
 PostprocessingPipelineFunctor::~PostprocessingPipelineFunctor() = default;
 
 void PostprocessingPipelineFunctor::readParameters() {
-  nodeHandle_.param("output_topic", outputTopic_, std::string("elevation_map_raw"));
-  nodeHandle_.param("postprocessor_pipeline_name", filterChainParametersName_, std::string("postprocessor_pipeline"));
+  Parameters parameters;
+  nodeHandle_.param("output_topic", parameters.outputTopic_, std::string("elevation_map_raw"));
+  nodeHandle_.param("postprocessor_pipeline_name", parameters.filterChainParametersName_, std::string("postprocessor_pipeline"));
+  parameters_.setData(parameters);
 }
 
 grid_map::GridMap PostprocessingPipelineFunctor::operator()(GridMap& inputMap) {
