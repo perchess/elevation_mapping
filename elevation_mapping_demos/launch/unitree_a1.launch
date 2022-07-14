@@ -9,7 +9,7 @@
   <!-- Run a passthrough filter to down-sample the sensor point cloud.-->
   <node pkg="nodelet" type="nodelet" name="pcl_manager" args="manager" output="screen"/>
   <node pkg="nodelet" type="nodelet" name="voxel_grid" args="load pcl/VoxelGrid pcl_manager" output="screen">
-    <remap from="~input" to="/points"/>
+    <remap from="~input" to="/raisim_unitree_ros_driver/points"/>
     <remap from="~output" to="/points_downsampled"/>
     <rosparam>
       filter_field_name: z
