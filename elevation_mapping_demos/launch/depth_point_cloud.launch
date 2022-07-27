@@ -18,6 +18,8 @@
         <!-- Output: XYZ point cloud. If using PCL, subscribe as PointCloud<PointXYZ>.  (sensor_msgs/PointCloud2)  -->
         <remap from="points" to="$(arg output_topic)"/>
 
+        <param name="~image_transport" value="compressedDepth" />
+
     </node>
         
 </launch>
