@@ -4,19 +4,19 @@
 
   <!-- Load robot_description param for tf, rviz  -->
 <!--  <param name="robot_description" command="$(find xacro)/xacro $(find a1_description)/xacro/robot.xacro DEBUG:=false"/>-->
-
+  <!-- <include file="$(find elevation_mapping_demos)/launch/depth_point_cloud.launch" /> -->
 
   <!-- Run a passthrough filter to down-sample the sensor point cloud.-->
   <node pkg="nodelet" type="nodelet" name="pcl_manager" args="manager" output="screen"/>
   <node pkg="nodelet" type="nodelet" name="voxel_grid" args="load pcl/VoxelGrid pcl_manager" output="screen">
-    <remap from="~input" to="/camera/depth/color/points"/>
+    <remap from="~input" to="/rs_d435/points"/>
     <remap from="~output" to="/points_downsampled"/>
     <rosparam>
       filter_field_name: z
       filter_limit_min: 0.0
       filter_limit_max: 2.0  <!-- Limit the range of points to forward to 6 meters in viewing direction-->
       filter_limit_negative: False
-      leaf_size: 0.02  <!-- Limit the density to 5 cm-->
+      leaf_size: 0.02  <!-- Limit the density to 2 cm-->
     </rosparam>
   </node>
 
@@ -33,6 +33,6 @@
   </node>
 
   <!-- Launch RViz with the demo configuration. -->
-  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find elevation_mapping_demos)/rviz/turtlebot3_waffle_demo.rviz"/>
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find elevation_mapping_demos)/rviz/visualMPC.rviz"/>
 
 </launch>

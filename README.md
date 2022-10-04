@@ -1,5 +1,18 @@
 # Robot-Centric Elevation Mapping
 
+Forked from [ANYbotics github repo](https://github.com/ANYbotics/elevation_mapping)
+
+## Unitree A1 Usage
+
+With Raisim simulation:
+
+    roslaunch elevation_mapping_demos unitree_a1.launch
+
+With real robot:
+
+    roslaunch elevation_mapping_demos unitree_a1_pi_rs.launch
+    
+
 ## Overview
 
 This is a [ROS] package developed for elevation mapping with a mobile robot. The software is designed for (local) navigation tasks with robots which are equipped with a pose estimation (e.g. IMU & odometry) and a distance sensor (e.g. structured light (Kinect, RealSense), laser range sensor, stereo camera). The provided elevation map is limited around the robot and reflects the pose uncertainty that is aggregated through the motion of the robot (robot-centric mapping). This method is developed to explicitly handle drift of the robot pose estimation.
