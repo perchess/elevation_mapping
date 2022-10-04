@@ -16,6 +16,7 @@ postprocessor_pipeline: # set by postprocessor_pipeline_name
       radius: 0.1
       normal_vector_positive_axis: z
       parallelization_enabled: true
+      thread_number: 8
 
 #    Delete layers that are not needed to reduce bandwidth
   - name: delete_original_layers
