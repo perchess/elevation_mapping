@@ -13,7 +13,7 @@ postprocessor_pipeline: # set by postprocessor_pipeline_name
     params:
       input_layer: elevation
       output_layers_prefix: normal_vectors_
-      radius: 0.1
+      radius: 0.05
       normal_vector_positive_axis: z
       parallelization_enabled: true
       thread_number: 8

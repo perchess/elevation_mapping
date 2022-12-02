@@ -5,7 +5,6 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
-        - /TF1
         - /TF1/Frames1
       Splitter Ratio: 0.6264705657958984
     Tree Height: 831
@@ -495,6 +494,14 @@ Visualization Manager:
       Unreliable: false
       Use Rainbow: false
       Value: false
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /visual/swing_pf
+      Name: Marker
+      Namespaces:
+        "": true
+      Queue Size: 100
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -531,17 +538,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0.045182228088378906
-        Y: 0.14288729429244995
+        X: 0.5667278170585632
+        Y: 0.22323423624038696
         Z: -1.817941665649414e-06
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.10479714721441269
+      Pitch: 0.8847967982292175
       Target Frame: base_link
-      Yaw: 2.2303946018218994
+      Yaw: 1.950394630432129
     Saved: ~
 Window Geometry:
   Displays:
